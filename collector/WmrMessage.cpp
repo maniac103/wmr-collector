@@ -110,6 +110,7 @@ WmrMessage::parse()
 	debug << ":" << std::setw(2) << std::setfill('0') << time.tm_min;
 	debug << ":" << std::setw(2) << std::setfill('0') << time.tm_sec;
 	debug << "]: type " << BYTEFORMAT_HEX m_type;
+	debug << ", flags " << BYTEFORMAT_HEX m_flags;
 	debug << ", data ";
 	for (size_t i = 0; i < m_data.size(); i++) {
 	    debug << " " << BYTEFORMAT_HEX m_data[i];
@@ -223,10 +224,10 @@ WmrMessage::parseFlags()
 	debug << "Battery " << (batteryLow ? "low" : "ok");
     }
     if (m_type == msgTypeDateTime) {
-	bool externalPower = m_flags & 0x80;
+	bool externalPowerMissing = m_flags & 0x80;
 	bool dcfOk = m_flags & 0x20;
 	if (debug) {
-	    if (externalPower) {
+	    if (!externalPowerMissing) {
 		debug << ", externally powered";
 	    }
 	    debug << ", DCF " << (dcfOk ? "" : "not ") << "synchronized";
