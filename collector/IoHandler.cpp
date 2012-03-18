@@ -6,6 +6,8 @@
 
 IoHandler::IoHandler(const std::string& host, const std::string& port, Database& db) :
     boost::asio::io_service(),
+    m_state(StartMarker),
+    m_pos(0),
     m_socket(*this),
     m_db(db),
     m_active(true)
@@ -43,7 +45,7 @@ void
 IoHandler::readComplete(const boost::system::error_code& error,
 			size_t bytesTransferred)
 {
-    size_t pos = 0, count;
+    size_t pos = 0;
     DebugStream& debug = Options::ioDebug();
 
     if (error) {
@@ -62,30 +64,47 @@ IoHandler::readComplete(const boost::system::error_code& error,
     }
 
     while (pos < bytesTransferred) {
-	m_data.push_back(m_recvBuffer[pos++]);
-	count = m_data.size();
+	uint8_t dataByte = m_recvBuffer[pos++];
+	ssize_t len;
 
-	if (count > 1 && m_data[count - 1] == 0xff && m_data[count - 2] == 0xff) {
-	    std::vector<uint8_t>::iterator end = m_data.begin() + count - 2;
-	    std::vector<uint8_t> packet(m_data.begin(), end);
-	    if (packet.size() < 2) {
-		continue;
-	    }
-	    /* throw away junk at beginning */
-	    for (size_t i = 0; i < packet.size() - 1; i++) {
-		if (packet[i] == 0xff && packet[i + 1] == 0xff) {
-		    packet.erase(packet.begin(), packet.begin() + i + 2);
-		    break;
+	switch (m_state) {
+	    case StartMarker:
+		if (m_pos == 0 && dataByte == 0xff) {
+		    m_pos++;
+		} else if (m_pos == 1 && dataByte == 0xff) {
+		    m_state = Flags;
+		} else {
+		    m_pos = 0;
 		}
-	    }
-
-	    /* handle packet */
-	    WmrMessage message(packet, m_db);
-	    if (message.isValid()) {
-		message.parse();
-	    }
-
-	    m_data.erase(m_data.begin(), end);
+		break;
+	    case Flags:
+		m_data.push_back(dataByte);
+		m_state = Type;
+		break;
+	    case Type:
+		len = WmrMessage::packetLengthForType(dataByte);
+		if (len > 0) {
+		    m_pos = len - 2; /* we already read flags + type */
+		    m_state = Data;
+		    m_data.push_back(dataByte);
+		} else {
+		    m_data.clear();
+		    m_state = StartMarker;
+		    m_pos = 0;
+		}
+		break;
+	    case Data:
+		m_data.push_back(dataByte);
+		m_pos--;
+		if (m_pos == 0) {
+		    WmrMessage message(m_data, m_db);
+		    if (message.isValid()) {
+			message.parse();
+		    }
+		    m_data.clear();
+		    m_state = StartMarker;
+		}
+		break;
 	}
     }
 

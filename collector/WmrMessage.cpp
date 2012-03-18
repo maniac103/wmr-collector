@@ -16,13 +16,34 @@ WmrMessage::WmrMessage(const std::vector<uint8_t>& data, Database& db) :
     m_valid = checkValidityAndCopyData(data);
 }
 
+ssize_t
+WmrMessage::packetLengthForType(uint8_t type)
+{
+    switch (type) {
+	case msgTypeTempHumidity:
+	    return 12;
+	case msgTypeRain:
+	    return 17;
+	case msgTypeAirPressure:
+	    return 8;
+	case msgTypeWind:
+	    return 11;
+	case msgTypeUV:
+	    return 6;
+	case msgTypeDateTime:
+	    return 12;
+    }
+
+    return -1;
+}
+
 bool
 WmrMessage::checkValidityAndCopyData(const std::vector<uint8_t>& data)
 {
     DebugStream& debug = Options::messageDebug();
     std::vector<uint8_t>::const_iterator iter;
     uint16_t calcChecksum = 0, pktChecksum;
-    size_t expected;
+    ssize_t expected;
 
     /* minimum packet length: flags + type + 2 byte checksum */
     if (data.size() < 4) {
@@ -50,39 +71,22 @@ WmrMessage::checkValidityAndCopyData(const std::vector<uint8_t>& data)
     m_type = data[1];
     m_data.insert(m_data.begin(), data.begin() + 2, data.end() - 2);
 
-    switch (m_type) {
-	case msgTypeTempHumidity:
-	    expected = 8;
-	    break;
-	case msgTypeRain:
-	    expected = 13;
-	    break;
-	case msgTypeAirPressure:
-	    expected = 4;
-	    break;
-	case msgTypeWind:
-	    expected = 7;
-	    break;
-	case msgTypeUV:
-	    expected = 2;
-	    break;
-	case msgTypeDateTime:
-	    expected = 8;
-	    break;
-	default:
-	    if (debug) {
-		debug << "Unexpected type " << BYTEFORMAT_HEX m_type << std::endl;
-	    }
-	    return false;
-    }
-
-    if (m_data.size() != expected) {
+    expected = packetLengthForType(m_type);
+    if (expected < 0) {
 	if (debug) {
-	    debug << "Unexpected packet size for type " << BYTEFORMAT_HEX m_type;
-	    debug << " (" << std::dec << m_data.size();
-	    debug << " vs. " << expected << ")" << std::endl;
+	    debug << "Unexpected type " << BYTEFORMAT_HEX m_type << std::endl;
 	}
 	return false;
+    } else {
+	expected -= 4; /* flags + type + checksum */
+	if (m_data.size() != expected) {
+	    if (debug) {
+		debug << "Unexpected packet size for type " << BYTEFORMAT_HEX m_type;
+		debug << " (" << std::dec << m_data.size();
+		debug << " vs. " << expected << ")" << std::endl;
+	    }
+	    return false;
+	}
     }
 
     return true;

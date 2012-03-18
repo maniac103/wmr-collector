@@ -9,6 +9,7 @@ class WmrMessage
     public:
 	WmrMessage(const std::vector<uint8_t>& data, Database& db);
 
+	static ssize_t packetLengthForType(uint8_t type);
 	bool isValid() const {
 	    return m_valid;
 	}

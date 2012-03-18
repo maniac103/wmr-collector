@@ -39,6 +39,14 @@ class IoHandler : public boost::asio::io_service
 	void doClose(const boost::system::error_code& error);
 
     private:
+	enum {
+	    StartMarker,
+	    Flags,
+	    Type,
+	    Data
+	} m_state;
+
+	size_t m_pos;
 	boost::asio::ip::tcp::socket m_socket;
 	Database& m_db;
 	bool m_active;
