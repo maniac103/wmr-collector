@@ -5,10 +5,11 @@
 #include "WmrMessage.h"
 #include "Options.h"
 
-#define BYTEFORMAT_HEX \
-    "0x" << std::setbase(16) << std::setw(2) << std::setfill('0') << (unsigned int)
-#define BYTEFORMAT_DEC \
-    std::dec << (unsigned int)
+#define HEX(value) \
+    "0x" << std::setbase(16) << std::setw(2) << \
+    std::setfill('0') << (unsigned int) (value) << std::dec
+#define DEC(value) \
+    std::dec << (unsigned int) (value)
 
 WmrMessage::WmrMessage(const std::vector<uint8_t>& data, Database& db) :
     m_db(db)
@@ -74,16 +75,16 @@ WmrMessage::checkValidityAndCopyData(const std::vector<uint8_t>& data)
     expected = packetLengthForType(m_type);
     if (expected < 0) {
 	if (debug) {
-	    debug << "Unexpected type " << BYTEFORMAT_HEX m_type << std::endl;
+	    debug << "Unexpected type " << HEX(m_type) << std::endl;
 	}
 	return false;
     } else {
 	expected -= 4; /* flags + type + checksum */
 	if (m_data.size() != expected) {
 	    if (debug) {
-		debug << "Unexpected packet size for type " << BYTEFORMAT_HEX m_type;
-		debug << " (" << std::dec << m_data.size();
-		debug << " vs. " << expected << ")" << std::endl;
+		debug << "Unexpected packet size for type " << HEX(m_type);
+		debug << " (" << m_data.size() << " vs. " << expected << ")";
+		debug << std::endl;
 	    }
 	    return false;
 	}
@@ -106,18 +107,18 @@ WmrMessage::parse()
 	struct tm time;
 
 	localtime_r(&now, &time);
-	debug << std::dec << "MESSAGE[";
+	debug << "MESSAGE[";
 	debug << std::setw(2) << std::setfill('0') << time.tm_mday;
 	debug << "." << std::setw(2) << std::setfill('0') << (time.tm_mon + 1);
 	debug << "." << (time.tm_year + 1900) << " ";
 	debug << std::setw(2) << std::setfill('0') << time.tm_hour;
 	debug << ":" << std::setw(2) << std::setfill('0') << time.tm_min;
 	debug << ":" << std::setw(2) << std::setfill('0') << time.tm_sec;
-	debug << "]: type " << BYTEFORMAT_HEX m_type;
-	debug << ", flags " << BYTEFORMAT_HEX m_flags;
+	debug << "]: type " << HEX(m_type);
+	debug << ", flags " << HEX(m_flags);
 	debug << ", data ";
 	for (size_t i = 0; i < m_data.size(); i++) {
-	    debug << " " << BYTEFORMAT_HEX m_data[i];
+	    debug << " " << HEX(m_data[i]);
 	}
 	debug << std::endl;
     }
@@ -148,7 +149,7 @@ WmrMessage::parse()
 		DebugStream& dataDebug = Options::dataDebug();
 		if (dataDebug) {
 		    dataDebug << "DATA: Unhandled message received";
-		    dataDebug << "(type " << BYTEFORMAT_HEX m_type << ")." << std::endl;
+		    dataDebug << "(type " << HEX(m_type) << ")." << std::endl;
 		}
 	    }
 	    break;
@@ -276,11 +277,12 @@ WmrMessage::parseRainMessage()
     if (debug) {
 	debug << "Rain: rate " << rate << ", this hour " << thisHour;
 	debug << ", thisDay " << thisDay << ", total " << total;
-	debug << " since " << BYTEFORMAT_DEC m_data[10] << ".";
-	debug << BYTEFORMAT_DEC m_data[11] << ".";
-	debug << BYTEFORMAT_DEC (2000 + m_data[12]);
-	debug << " " << BYTEFORMAT_DEC m_data[9] << ":";
-	debug << BYTEFORMAT_DEC m_data[8] << std::endl;
+	debug << " since " << std::setw(2) << std::setfill('0') << DEC(m_data[10]);
+	debug << "." << std::setw(2) << std::setfill('0') << DEC(m_data[11]);
+	debug << "." << DEC(2000 + m_data[12]) << " ";
+	debug << std::setw(2) << std::setfill('0') << DEC(m_data[9]);
+	debug << ":" << std::setw(2) << std::setfill('0') << DEC(m_data[8]);
+	debug << std::endl;
     }
 }
 
@@ -312,7 +314,7 @@ WmrMessage::parseWindMessage()
     float gustSpeed = 0.1f * (((m_data[3] & 0x0f) << 8) + m_data[2]);
 
     if (debug) {
-	debug << "Wind direction " << BYTEFORMAT_HEX direction;
+	debug << "Wind direction " << HEX(direction);
 	debug << " -> " << degrees << "°, speed avg. ";
 	debug << avgSpeed << " m/s, gust " << gustSpeed << " m/s" << std::endl;
     }
@@ -335,12 +337,11 @@ WmrMessage::parseDateTimeMessage()
     DebugStream& debug = Options::dataDebug();
 
     if (debug) {
-	debug << "Date = " << BYTEFORMAT_DEC m_data[4] << ".";
-	debug << BYTEFORMAT_DEC m_data[5] << ".";
-	debug << BYTEFORMAT_DEC (2000 + m_data[6]) << std::endl;
-	debug << "Time = " << BYTEFORMAT_DEC m_data[3] << ":";
-	debug << BYTEFORMAT_DEC m_data[2] << std::endl;
+	debug << "Date = " << std::setw(2) << std::setfill('0') << DEC(m_data[4]);
+	debug << "." << std::setw(2) << std::setfill('0') << DEC(m_data[5]);
+	debug << "." << DEC(2000 + m_data[6]) << std::endl;
+	debug << "Time = " << std::setw(2) << std::setfill('0') << DEC(m_data[3]);
+	debug << ":" << std::setw(2) << std::setfill('0') << DEC(m_data[2]);
+	debug << std::endl;
     }
 }
-
-
