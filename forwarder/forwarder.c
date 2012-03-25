@@ -17,9 +17,6 @@
 #define HEARTBEAT_INTERVAL 25
 #define RESET_TIMEOUT      60
 
-static int clientfds[MAXCLIENTS];
-static int client_count = 0;
-
 static int
 create_and_bind_socket(char *port)
 {
@@ -39,13 +36,18 @@ create_and_bind_socket(char *port)
     }
 
     for (rp = result; rp != NULL; rp = rp->ai_next) {
+	int opt = 1;
+
 	sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 	if (sfd == -1) {
 	    continue;
 	}
 
-	s = bind(sfd, rp->ai_addr, rp->ai_addrlen);
-	if (s == 0) {
+	if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) == -1) {
+	    perror("setsockopt");
+	} else if (bind(sfd, rp->ai_addr, rp->ai_addrlen) < 0) {
+	    perror("bind");
+	} else {
 	    /* We managed to bind successfully! */
 	    break;
 	}
@@ -121,7 +123,7 @@ send_hmr_heartbeat(int fd)
     return write_exact(fd, heartbeat, sizeof(heartbeat));
 }
 
-static void
+static int
 add_fd_to_epoll(int efd, int fd)
 {
     struct epoll_event event;
@@ -130,70 +132,48 @@ add_fd_to_epoll(int efd, int fd)
     event.events = EPOLLIN | EPOLLET;
     if (epoll_ctl(efd, EPOLL_CTL_ADD, fd, &event) < 0) {
 	perror("epoll_ctl");
-	abort();
+	return -1;
     }
+
+    return 0;
 }
 
 static void
-remove_client(int fd)
+remove_client(int fd, int *clientfds, int *client_count)
 {
     int cl, clnext;
 
     close (fd);
-    for (cl = 0; cl < client_count; cl++) {
+    for (cl = 0; cl < *client_count; cl++) {
 	if (fd == clientfds[cl]) {
-	    for (clnext = cl + 1; clnext < client_count; clnext++) {
+	    for (clnext = cl + 1; clnext < *client_count; clnext++) {
 		clientfds[cl] = clientfds[clnext];
 	    }
-	    client_count--;
+	    (*client_count)--;
 	    break;
 	}
     }
 }
 
-int
-main (int argc, char *argv[])
+static int
+event_loop(int sockfd, int hidfd)
 {
-    int efd, hidfd, sfd, s;
+    int efd, i, s, result = -1;
     struct epoll_event events[MAXEVENTS];
     struct timeval last_recv, last_heartbeat;
-
-    if (argc != 3) {
-	fprintf (stderr, "Usage: %s [hiddev] [port]\n", argv[0]);
-	exit (EXIT_FAILURE);
-    }
-
-    hidfd = open(argv[1], O_RDWR);
-    if (hidfd < 0) {
-	perror("open");
-	exit(EXIT_FAILURE);
-    }
-    if (make_fd_non_blocking(hidfd) < 0) {
-	abort();
-    }
-
-    sfd = create_and_bind_socket(argv[2]);
-    if (sfd == -1) {
-	abort();
-    }
-    if (make_fd_non_blocking(sfd) < 0) {
-	abort();
-    }
-
-    s = listen(sfd, SOMAXCONN);
-    if (s == -1) {
-	perror("listen");
-	abort();
-    }
+    int clientfds[MAXCLIENTS];
+    int client_count = 0;
 
     efd = epoll_create1(0);
     if (efd == -1) {
 	perror("epoll_create");
-	abort();
+	goto out;
     }
 
-    add_fd_to_epoll(efd, hidfd);
-    add_fd_to_epoll(efd, sfd);
+    if (add_fd_to_epoll(efd, hidfd) < 0 || add_fd_to_epoll(efd, sockfd) < 0) {
+	goto out;
+    }
+
     memset(events, 0, sizeof(events));
     memset(&last_recv, 0, sizeof(last_recv));
     memset(&last_heartbeat, 0, sizeof(last_heartbeat));
@@ -203,6 +183,14 @@ main (int argc, char *argv[])
 	int n, item;
 
 	n = epoll_wait (efd, events, MAXEVENTS, 2000);
+	if (n < 0) {
+	    if (errno == EINTR) {
+		result = 0;
+	    } else {
+		perror("epoll_wait");
+	    }
+	    goto out;
+	}
 
 	if (client_count > 0) {
 	    struct timeval now;
@@ -223,9 +211,13 @@ main (int argc, char *argv[])
 
 	    if (ev->events & (EPOLLERR | EPOLLHUP)) {
 		fprintf (stderr, "epoll error\n");
-		remove_client(ev->data.fd);
-		continue;
-	    } else if (sfd == ev->data.fd) {
+		if (ev->data.fd == sockfd || ev->data.fd == hidfd) {
+		    goto out;
+		} else {
+		    remove_client(ev->data.fd, clientfds, &client_count);
+		    continue;
+		}
+	    } else if (sockfd == ev->data.fd) {
 		/* We have a notification on the listening socket, which
 		 * means one or more incoming connections. */
 		while (1) {
@@ -235,7 +227,7 @@ main (int argc, char *argv[])
 		    char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 
 		    in_len = sizeof(in_addr);
-		    infd = accept(sfd, &in_addr, &in_len);
+		    infd = accept(sockfd, &in_addr, &in_len);
 		    if (infd == -1) {
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
 			    /* We have processed all incoming
@@ -258,9 +250,14 @@ main (int argc, char *argv[])
 		     * list of fds to monitor. */
 		    s = make_fd_non_blocking(infd);
 		    if (s == -1) {
-			abort();
+			close(infd);
+			continue;
 		    }
 
+		    if (add_fd_to_epoll(efd, infd) < 0) {
+			close(infd);
+			continue;
+		    }
 		    if (client_count < MAXCLIENTS) {
 			if (client_count == 0) {
 			    send_hmr_reset(hidfd);
@@ -270,7 +267,6 @@ main (int argc, char *argv[])
 			}
 			clientfds[client_count++] = infd;
 		    }
-		    add_fd_to_epoll(efd, infd);
 		}
 	    } else if (hidfd == ev->data.fd) {
 		char buf[8];
@@ -282,7 +278,7 @@ main (int argc, char *argv[])
 		    if (length < 8) {
 			for (cl = 0; cl < client_count; ) {
 			    if (write_exact(clientfds[cl], buf + 1, length) < 0) {
-				remove_client(clientfds[cl]);
+				remove_client(clientfds[cl], clientfds, &client_count);
 				/* keep cl, as remove_client shifted the array */
 			    } else {
 				cl++;
@@ -322,16 +318,63 @@ main (int argc, char *argv[])
 		    printf ("Closed connection on descriptor %d\n", ev->data.fd);
 		    /* Closing the descriptor will make epoll remove it
 		     * from the set of descriptors which are monitored. */
-		    remove_client(ev->data.fd);
+		    remove_client(ev->data.fd, clientfds, &client_count);
 		}
 	    }
 	}
     }
 
-    close(efd);
-    close(sfd);
-    close(hidfd);
+out:
+    for (i = 0; i < client_count; i++) {
+	close(clientfds[i]);
+    }
+    if (efd >= 0) {
+	close(efd);
+    }
+    return result;
+}
 
-    return EXIT_SUCCESS;
+int
+main (int argc, char *argv[])
+{
+    int hidfd, sfd = -1;
+
+    if (argc != 3) {
+	fprintf (stderr, "Usage: %s [hiddev] [port]\n", argv[0]);
+	exit (EXIT_FAILURE);
+    }
+
+    while (1) {
+	int ok = 0;
+
+	hidfd = open(argv[1], O_RDWR);
+	if (hidfd < 0 || make_fd_non_blocking(hidfd) < 0) {
+	    perror("open hid");
+	} else {
+	    sfd = create_and_bind_socket(argv[2]);
+	    if (sfd < 0 || make_fd_non_blocking(sfd) < 0) {
+		perror("open socket");
+	    } else if (listen(sfd, SOMAXCONN) < 0) {
+		perror("listen");
+	    } else {
+		ok = 1;
+	    }
+	}
+
+	if (ok) {
+	    if (event_loop(sfd, hidfd) == 0) {
+		break;
+	    }
+	}
+	if (hidfd >= 0) {
+	    close(hidfd);
+	}
+	if (sfd >= 0) {
+	    close(sfd);
+	}
+	sleep(10);
+    }
+
+    return 0;
 }
 
