@@ -1,11 +1,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/epoll.h>
+#include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -16,6 +18,8 @@
 
 #define HEARTBEAT_INTERVAL 25
 #define RESET_TIMEOUT      60
+
+static int g_running = 1;
 
 static int
 create_and_bind_socket(char *port)
@@ -155,10 +159,10 @@ remove_client(int fd, int *clientfds, int *client_count)
     }
 }
 
-static int
+static void
 event_loop(int sockfd, int hidfd)
 {
-    int efd, i, s, result = -1;
+    int efd, i, s;
     struct epoll_event events[MAXEVENTS];
     struct timeval last_recv, last_heartbeat;
     int clientfds[MAXCLIENTS];
@@ -184,9 +188,7 @@ event_loop(int sockfd, int hidfd)
 
 	n = epoll_wait (efd, events, MAXEVENTS, 2000);
 	if (n < 0) {
-	    if (errno == EINTR) {
-		result = 0;
-	    } else {
+	    if (errno != EINTR) {
 		perror("epoll_wait");
 	    }
 	    goto out;
@@ -331,27 +333,96 @@ out:
     if (efd >= 0) {
 	close(efd);
     }
-    return result;
+}
+
+static void
+usage(const char *program)
+{
+    fprintf(stderr, "Usage: %s [-f] [-p port] [-P pidfile] devicename\n", program);
+}
+
+static void
+handle_sigterm(int signal)
+{
+    g_running = 0;
 }
 
 int
 main (int argc, char *argv[])
 {
-    int hidfd, sfd = -1;
+    int opt, hidfd, sfd = -1;
+    int daemonize = 1;
+    char *port = "9876";
+    char *pid_path = NULL;
+    char *hid_path = NULL;
+    int pidfd = -1;
 
-    if (argc != 3) {
-	fprintf (stderr, "Usage: %s [hiddev] [port]\n", argv[0]);
-	exit (EXIT_FAILURE);
+    while ((opt = getopt(argc, argv, "fp:P:d:")) != -1) {
+	switch (opt) {
+	    case 'f':
+		daemonize = 0;
+		break;
+	    case 'p':
+		port = optarg;
+		break;
+	    case 'P':
+		pid_path = optarg;
+		break;
+	    default:
+		usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
     }
+
+    if (optind >= argc) {
+	usage(argv[0]);
+	exit(EXIT_FAILURE);
+    }
+    hid_path = argv[optind];
+
+    if (pid_path) {
+	/* open pidfile */
+	pidfd = open(pid_path, O_RDWR | O_CREAT | O_NOFOLLOW, 0644);
+	if (pidfd < 0) {
+	    perror("open pidfile");
+	} else {
+	    /* lock it */
+	    if (flock(pidfd, LOCK_EX | LOCK_NB) != 0) {
+		if (errno == EWOULDBLOCK) {
+		    exit(EXIT_SUCCESS);
+		} else {
+		    perror("lock pidfile");
+		}
+	    }
+	}
+    }
+
+    if (daemonize) {
+	if (daemon(1, 1) != 0) {
+	    perror("daemonize");
+	}
+    }
+
+    if (pidfd >= 0) {
+	/* truncate pidfile at 0 length */
+	ftruncate(pidfd, 0);
+	dprintf(pidfd, "%u\n", getpid());
+	/* unlock the pidfile */
+	flock(pidfd, LOCK_UN);
+	close(pidfd);
+    }
+
+    signal(SIGINT, handle_sigterm);
+    signal(SIGTERM, handle_sigterm);
 
     while (1) {
 	int ok = 0;
 
-	hidfd = open(argv[1], O_RDWR);
+	hidfd = open(hid_path, O_RDWR);
 	if (hidfd < 0 || make_fd_non_blocking(hidfd) < 0) {
 	    perror("open hid");
 	} else {
-	    sfd = create_and_bind_socket(argv[2]);
+	    sfd = create_and_bind_socket(port);
 	    if (sfd < 0 || make_fd_non_blocking(sfd) < 0) {
 		perror("open socket");
 	    } else if (listen(sfd, SOMAXCONN) < 0) {
@@ -362,17 +433,25 @@ main (int argc, char *argv[])
 	}
 
 	if (ok) {
-	    if (event_loop(sfd, hidfd) == 0) {
-		break;
-	    }
+	    event_loop(sfd, hidfd);
 	}
+
 	if (hidfd >= 0) {
 	    close(hidfd);
 	}
 	if (sfd >= 0) {
 	    close(sfd);
 	}
-	sleep(10);
+	if (g_running) {
+	    sleep(10);
+	}
+	if (!g_running) {
+	    break;
+	}
+    }
+
+    if (pidfd >= 0) {
+	unlink(pid_path);
     }
 
     return 0;
