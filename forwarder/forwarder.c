@@ -382,7 +382,7 @@ main (int argc, char *argv[])
 
     if (pid_path) {
 	/* open pidfile */
-	pidfd = open(pid_path, O_RDWR | O_CREAT | O_NOFOLLOW, 0644);
+	pidfd = open(pid_path, O_RDWR | O_CREAT, 0644);
 	if (pidfd < 0) {
 	    perror("open pidfile");
 	} else {
