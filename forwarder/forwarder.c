@@ -398,7 +398,7 @@ main (int argc, char *argv[])
     }
 
     if (daemonize) {
-	if (daemon(1, 1) != 0) {
+	if (daemon(0, 0) != 0) {
 	    perror("daemonize");
 	}
     }
