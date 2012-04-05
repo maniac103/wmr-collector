@@ -10,7 +10,7 @@
 class IoHandler : public boost::asio::io_service
 {
     public:
-	IoHandler(const std::string& host, const std::string& port, Database& db);
+	IoHandler(const std::string& host, const std::string& port, boost::shared_ptr<Database>& db);
 	~IoHandler();
 
 	void close() {
@@ -48,7 +48,7 @@ class IoHandler : public boost::asio::io_service
 
 	size_t m_pos;
 	boost::asio::ip::tcp::socket m_socket;
-	Database& m_db;
+	boost::shared_ptr<Database> m_db;
 	bool m_active;
 	unsigned char m_recvBuffer[maxReadLength];
 	std::vector<uint8_t> m_data;

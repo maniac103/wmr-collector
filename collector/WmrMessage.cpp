@@ -11,7 +11,7 @@
 #define DEC(value) \
     std::dec << (unsigned int) (value)
 
-WmrMessage::WmrMessage(const std::vector<uint8_t>& data, Database& db) :
+WmrMessage::WmrMessage(const std::vector<uint8_t>& data, boost::shared_ptr<Database>& db) :
     m_db(db)
 {
     m_valid = checkValidityAndCopyData(data);
@@ -80,7 +80,7 @@ WmrMessage::checkValidityAndCopyData(const std::vector<uint8_t>& data)
 	return false;
     } else {
 	expected -= 4; /* flags + type + checksum */
-	if (m_data.size() != expected) {
+	if (m_data.size() != (size_t) expected) {
 	    if (debug) {
 		debug << "Unexpected packet size for type " << HEX(m_type);
 		debug << " (" << m_data.size() << " vs. " << expected << ")";
@@ -156,69 +156,6 @@ WmrMessage::parse()
     }
 }
 
-#if 0
-void
-EmsMessage::printNumberAndAddToDb(size_t offset, size_t size, int divider,
-				  const char *name, const char *unit,
-				  Database::NumericSensors sensor)
-{
-    int value = 0;
-    float floatVal;
-
-    for (size_t i = offset; i < offset + size; i++) {
-	value = (value << 8) | m_data[i];
-    }
-
-    /* treat values with highest bit set as negative
-     * e.g. size = 2, value = 0xfffe -> real value -2
-     */
-    if (m_data[offset] & 0x80) {
-	value = value - (1 << (size * 8));
-    }
-
-    floatVal = value;
-    if (divider > 1) {
-	floatVal /= divider;
-    }
-
-    if (Options::dataDebug()) {
-	Options::dataDebug() << "DATA: " << name << " = " << floatVal << " " << unit << std::endl;
-    }
-    if (m_db && sensor != Database::NumericSensorLast) {
-	m_db->addSensorValue(sensor, floatVal);
-    }
-}
-
-void
-EmsMessage::printBoolAndAddToDb(int byte, int bit, const char *name,
-				Database::BooleanSensors sensor)
-{
-    bool flagSet = m_data[byte] & (1 << bit);
-
-    if (Options::dataDebug()) {
-	Options::dataDebug() << "DATA: " << name << " = "
-			     << (flagSet ? "AN" : "AUS") << std::endl;
-    }
-
-    if (m_db && sensor != Database::BooleanSensorLast) {
-	m_db->addSensorValue(sensor, flagSet);
-    }
-}
-
-void
-EmsMessage::printStateAndAddToDb(const std::string& value, const char *name,
-				 Database::StateSensors sensor)
-{
-    if (Options::dataDebug()) {
-	Options::dataDebug() << "DATA: " << name << " = " << value << std::endl;
-    }
-
-    if (m_db && sensor != Database::StateSensorLast) {
-	m_db->addSensorValue(sensor, value);
-    }
-}
-#endif
-
 void
 WmrMessage::parseFlags()
 {
@@ -263,6 +200,35 @@ WmrMessage::parseTemperatureMessage()
 	debug << "°C, dew point " << dewPoint << "°C, humidity ";
 	debug << humidity << "%, smiley " << smiley << ", trend " << trend << std::endl;
     }
+
+    if (m_db) {
+	Database::NumericSensors tempSensor = (sensor == 0) ? Database::SensorTempInside :
+					      (sensor == 1) ? Database::SensorTempOutsideCh1 :
+					      (sensor == 2) ? Database::SensorTempOutsideCh2 :
+					      (sensor == 3) ? Database::SensorTempOutsideCh3 :
+					      Database::NumericSensorLast;
+	if (tempSensor != Database::NumericSensorLast) {
+	    m_db->addSensorValue(tempSensor, temperature);
+	}
+
+	Database::NumericSensors dewSensor = (sensor == 0) ? Database::SensorDewPointInside :
+					     (sensor == 1) ? Database::SensorDewPointOutsideCh1 :
+					     (sensor == 2) ? Database::SensorDewPointOutsideCh2 :
+					     (sensor == 3) ? Database::SensorDewPointOutsideCh3 :
+					     Database::NumericSensorLast;
+	if (dewSensor != Database::NumericSensorLast) {
+	    m_db->addSensorValue(tempSensor, dewPoint);
+	}
+
+	Database::NumericSensors humidSensor = (sensor == 0) ? Database::SensorHumidityInside :
+					       (sensor == 1) ? Database::SensorHumidityOutsideCh1 :
+					       (sensor == 2) ? Database::SensorHumidityOutsideCh2 :
+					       (sensor == 3) ? Database::SensorHumidityOutsideCh3 :
+					       Database::NumericSensorLast;
+	if (humidSensor != Database::NumericSensorLast) {
+	    m_db->addSensorValue(tempSensor, humidity);
+	}
+    }
 }
 
 void
@@ -284,6 +250,10 @@ WmrMessage::parseRainMessage()
 	debug << ":" << std::setw(2) << std::setfill('0') << DEC(m_data[8]);
 	debug << std::endl;
     }
+
+    if (m_db) {
+	m_db->addSensorValue(Database::SensorRainfall, rate);
+    }
 }
 
 void
@@ -302,6 +272,10 @@ WmrMessage::parsePressureMessage()
 	debug << "Forecast: sea level " << forecast;
 	debug << ", altitude " << altForecast << std::endl;
     }
+
+    if (m_db) {
+	m_db->addSensorValue(Database::SensorAirPressure, pressure);
+    }
 }
 
 void
@@ -318,6 +292,14 @@ WmrMessage::parseWindMessage()
 	debug << " -> " << degrees << "°, speed avg. ";
 	debug << avgSpeed << " m/s, gust " << gustSpeed << " m/s" << std::endl;
     }
+
+    if (m_db) {
+	m_db->addSensorValue(Database::SensorWindSpeedAvg, avgSpeed);
+	if (avgSpeed != gustSpeed) {
+	    m_db->addSensorValue(Database::SensorWindSpeedGust, gustSpeed);
+	}
+	m_db->addSensorValue(Database::SensorWindDirection, degrees);
+    }
 }
 
 void
@@ -328,6 +310,9 @@ WmrMessage::parseUVMessage()
 
     if (debug) {
 	debug << "UV level: " << level << std::endl;
+    }
+    if (m_db) {
+	m_db->addSensorValue(Database::SensorUVLevel, (float) level);
     }
 }
 

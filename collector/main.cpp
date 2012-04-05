@@ -4,12 +4,12 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
 #include "IoHandler.h"
-#include "Database.h"
+#include "MysqlDatabase.h"
 #include "Options.h"
 #include "PidFile.h"
 
 static IoHandler *
-getHandler(const std::string& target, Database& db)
+getHandler(const std::string& target, boost::shared_ptr<Database>& db)
 {
     size_t pos = target.find(':');
     if (pos != std::string::npos) {
@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 	siginfo_t info;
 	const std::string& dbPath = Options::databasePath();
 	PidFile pid(Options::pidFilePath());
-	Database db;
+	boost::shared_ptr<Database> db;
 	bool running = true;
 
 	if (Options::daemonize()) {
@@ -44,10 +44,13 @@ int main(int argc, char *argv[])
 	}
 
 	if (dbPath != "none") {
-	    if (!db.connect(dbPath, Options::databaseUser(), Options::databasePassword())) {
+	    MysqlDatabase *mysql = new MysqlDatabase();
+	    if (!mysql->connect(dbPath, Options::databaseUser(), Options::databasePassword())) {
 		std::cerr << "Could not connect to database" << std::endl;
+		delete mysql;
 		return 1;
 	    }
+	    db.reset(mysql);
 	}
 
 	if (Options::daemonize()) {

@@ -4,7 +4,7 @@
 #include "Options.h"
 #include "WmrMessage.h"
 
-IoHandler::IoHandler(const std::string& host, const std::string& port, Database& db) :
+IoHandler::IoHandler(const std::string& host, const std::string& port, boost::shared_ptr<Database>& db) :
     boost::asio::io_service(),
     m_state(StartMarker),
     m_pos(0),

@@ -47,10 +47,6 @@ class Options
 	    CloseAfterParse
 	} ParseResult;
 
-	static unsigned int rateLimit() {
-	    return m_rateLimit;
-	}
-
 	static const std::string& target() {
 	    return m_target;
 	}
@@ -92,7 +88,6 @@ class Options
 
     private:
 	static std::string m_target;
-	static unsigned int m_rateLimit;
 	static std::string m_pidFilePath;
 	static bool m_daemonize;
 	static std::string m_dbPath;

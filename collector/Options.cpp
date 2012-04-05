@@ -8,7 +8,6 @@
 namespace bpo = boost::program_options;
 
 std::string Options::m_target;
-unsigned int Options::m_rateLimit = 0;
 DebugStream Options::m_debugStreams[DebugCount];
 std::string Options::m_pidFilePath;
 bool Options::m_daemonize = true;
@@ -37,8 +36,6 @@ Options::parse(int argc, char *argv[])
     bpo::options_description general("General options");
     general.add_options()
 	("help,h", "Show this help message")
-	("ratelimit,r", bpo::value<unsigned int>(&m_rateLimit)->default_value(60),
-	 "Rate limit (in s) for writing numeric sensor values into DB")
 	("debug,d", bpo::value<std::string>()->default_value("none"),
 	 "Comma separated list of debug flags (all, io, message, data, stats, none) "
 	 " and their files, e.g. message=/tmp/messages.txt");

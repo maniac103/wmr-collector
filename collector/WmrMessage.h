@@ -2,12 +2,13 @@
 #define __WMRMESSAGE_H__
 
 #include <vector>
+#include <boost/shared_ptr.hpp>
 #include "Database.h"
 
 class WmrMessage
 {
     public:
-	WmrMessage(const std::vector<uint8_t>& data, Database& db);
+	WmrMessage(const std::vector<uint8_t>& data, boost::shared_ptr<Database>& db);
 
 	static ssize_t packetLengthForType(uint8_t type);
 	bool isValid() const {
@@ -35,18 +36,7 @@ class WmrMessage
 	void parseDateTimeMessage();
 
     private:
-#if 0
-	void printNumberAndAddToDb(size_t offset, size_t size, int divider,
-				   const char *name, const char *unit,
-				   Database::NumericSensors sensor);
-	void printBoolAndAddToDb(int byte, int bit, const char *name,
-				 Database::BooleanSensors sensor);
-	void printStateAndAddToDb(const std::string& value, const char *name,
-				  Database::StateSensors sensor);
-#endif
-
-    private:
-	Database& m_db;
+	boost::shared_ptr<Database> m_db;
 	bool m_valid;
 	uint8_t m_flags;
 	uint8_t m_type;

@@ -1,51 +1,51 @@
 #ifndef __DATABASE_H__
 #define __DATABASE_H__
 
-#include <map>
-#include <queue>
-#include <mysql++/connection.h>
-#include <mysql++/query.h>
-
 class Database {
+    protected:
+	Database() { };
     public:
-	Database();
-	~Database();
-
-    public:
-	bool connect(const std::string& server, const std::string& user, const std::string& password);
+	~Database() { };
 
     public:
 	typedef enum {
+	    SensorTempInside = 1,
+	    SensorHumidityInside = 2,
+	    SensorDewPointInside = 3,
+	    SensorTempOutsideCh1 = 11,
+	    SensorHumidityOutsideCh1 = 12,
+	    SensorDewPointOutsideCh1 = 13,
+	    SensorTempOutsideCh2 = 21,
+	    SensorHumidityOutsideCh2 = 22,
+	    SensorDewPointOutsideCh2 = 23,
+	    SensorTempOutsideCh3 = 31,
+	    SensorHumidityOutsideCh3 = 32,
+	    SensorDewPointOutsideCh3 = 33,
+	    SensorAirPressure = 41,
+	    SensorUVLevel = 42,
+	    SensorWindSpeedAvg = 45,
+	    SensorWindSpeedGust = 46,
+	    SensorWindDirection = 47,
+	    SensorRainfall = 51,
 	    /* not valid for DB */
-	    NumericSensorLast = 24
+	    NumericSensorLast = 255
 	} NumericSensors;
 
 	typedef enum {
 	    /* not valid for DB */
-	    BooleanSensorLast = 124
+	    BooleanSensorLast = 1
 	} BooleanSensors;
 
 	typedef enum {
 	    /* not valid for DB */
-	    StateSensorLast = 202
+	    StateSensorLast = 1
 	} StateSensors;
 
-	void addSensorValue(NumericSensors sensor, float value);
-	void addSensorValue(BooleanSensors sensor, bool value);
-	void addSensorValue(StateSensors sensor, const std::string& value);
+	virtual void addSensorValue(NumericSensors sensor, float value) {}
+	virtual void addSensorValue(BooleanSensors sensor, bool value) {}
+	virtual void addSensorValue(StateSensors sensor, const std::string& value) {}
 
-    private:
-	bool createTables();
-	void createSensorRows();
-	bool checkAndUpdateRateLimit(unsigned int sensor, time_t now);
-	bool executeQuery(mysqlpp::Query& query);
-
-    private:
-	static const char *dbName;
-	static const char *numericTableName;
-	static const char *booleanTableName;
-	static const char *stateTableName;
-
+    protected:
 	static const unsigned int sensorTypeNumeric = 1;
 	static const unsigned int sensorTypeBoolean = 2;
 	static const unsigned int sensorTypeState = 3;
@@ -53,17 +53,9 @@ class Database {
 	static const unsigned int readingTypeNone = 0;
 	static const unsigned int readingTypeTemperature = 1;
 	static const unsigned int readingTypePercent = 2;
-	static const unsigned int readingTypeCurrent = 3;
+	static const unsigned int readingTypeSpeed = 3;
 	static const unsigned int readingTypePressure = 4;
-	static const unsigned int readingTypeTime = 5;
-	static const unsigned int readingTypeCount = 6;
-
-	std::map<unsigned int, time_t> m_lastWrites;
-	std::map<unsigned int, float> m_numericCache;
-	std::map<unsigned int, bool> m_booleanCache;
-	std::map<unsigned int, std::string> m_stateCache;
-	std::map<unsigned int, mysqlpp::ulonglong> m_lastInsertIds;
-	mysqlpp::Connection *m_connection;
+	static const unsigned int readingTypeVolume = 5;
 };
 
 #endif /* __DATABASE_H__ */
