@@ -180,7 +180,6 @@ MysqlDatabase::createSensorRows()
     query.execute(SensorTempInside, sensorTypeNumeric, "Temperatur Innen", readingTypeTemperature, "°C", 1);
     query.execute(SensorHumidityInside, sensorTypeNumeric, "Luftfeuchte Innen", readingTypePercent, "%", 1);
     query.execute(SensorDewPointInside, sensorTypeNumeric, "Taupunkt Innen", readingTypeTemperature, "°C", 1);
-    query.execute(SensorHumidityInside, sensorTypeNumeric, "Luftfeuchte Innen", readingTypePercent, "%", 1);
     query.execute(SensorTempOutsideCh1, sensorTypeNumeric, "Temperatur Außen K1", readingTypeTemperature, "°C", 1);
     query.execute(SensorHumidityOutsideCh1, sensorTypeNumeric, "Luftfeuchte Außen K1", readingTypePercent, "%", 1);
     query.execute(SensorDewPointOutsideCh1, sensorTypeNumeric, "Taupunkt Außen K1", readingTypeTemperature, "°C", 1);
