@@ -186,9 +186,9 @@ MysqlDatabase::createSensorRows()
     query.execute(SensorTempOutsideCh2, sensorTypeNumeric, "Temperatur Außen K2", readingTypeTemperature, "°C", 1);
     query.execute(SensorHumidityOutsideCh2, sensorTypeNumeric, "Luftfeuchte Außen K2", readingTypePercent, "%", 1);
     query.execute(SensorDewPointOutsideCh2, sensorTypeNumeric, "Taupunkt Außen K2", readingTypeTemperature, "°C", 1);
-    query.execute(SensorTempOutsideCh2, sensorTypeNumeric, "Temperatur Außen K3", readingTypeTemperature, "°C", 1);
-    query.execute(SensorHumidityOutsideCh2, sensorTypeNumeric, "Luftfeuchte Außen K3", readingTypePercent, "%", 1);
-    query.execute(SensorDewPointOutsideCh2, sensorTypeNumeric, "Taupunkt Außen K3", readingTypeTemperature, "°C", 1);
+    query.execute(SensorTempOutsideCh3, sensorTypeNumeric, "Temperatur Außen K3", readingTypeTemperature, "°C", 1);
+    query.execute(SensorHumidityOutsideCh3, sensorTypeNumeric, "Luftfeuchte Außen K3", readingTypePercent, "%", 1);
+    query.execute(SensorDewPointOutsideCh3, sensorTypeNumeric, "Taupunkt Außen K3", readingTypeTemperature, "°C", 1);
     query.execute(SensorAirPressure, sensorTypeNumeric, "Luftdruck", readingTypePressure, "hPa", 0);
     query.execute(SensorWindSpeedAvg, sensorTypeNumeric, "Windgeschwindigkeit", readingTypeSpeed, "m/s", 1);
     query.execute(SensorWindSpeedGust, sensorTypeNumeric, "Spitzenwindgeschwindigkeit", readingTypeSpeed, "m/s", 1);
