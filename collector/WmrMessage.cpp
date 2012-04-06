@@ -274,7 +274,7 @@ WmrMessage::parsePressureMessage()
     }
 
     if (m_db) {
-	m_db->addSensorValue(Database::SensorAirPressure, pressure);
+	m_db->addSensorValue(Database::SensorAirPressure, altPressure);
     }
 }
 
