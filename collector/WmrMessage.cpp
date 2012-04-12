@@ -235,10 +235,10 @@ void
 WmrMessage::parseRainMessage()
 {
     DebugStream& debug = Options::messageDebug();
-    float rate = 0.01f * ((m_data[1] << 8) + m_data[0]);
-    float thisHour = 0.01f * ((m_data[3] << 8) + m_data[2]);
-    float thisDay = 0.01f * ((m_data[5] << 8) + m_data[4]);
-    float total = 0.01f * ((m_data[7] << 8) + m_data[6]);
+    float rate = 0.01f * 25.4f * ((m_data[1] << 8) + m_data[0]);
+    float thisHour = 0.01f * 25.4f * ((m_data[3] << 8) + m_data[2]);
+    float thisDay = 0.01f * 25.4f * ((m_data[5] << 8) + m_data[4]);
+    float total = 0.01f * 25.4f * ((m_data[7] << 8) + m_data[6]);
 
     if (debug) {
 	debug << "Rain: rate " << rate << ", this hour " << thisHour;
