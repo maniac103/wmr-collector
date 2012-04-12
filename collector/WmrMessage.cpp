@@ -2,6 +2,7 @@
 #include <sstream>
 #include <iomanip>
 #include <cassert>
+#include <cmath>
 #include "WmrMessage.h"
 #include "Options.h"
 
