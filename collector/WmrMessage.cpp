@@ -217,7 +217,7 @@ WmrMessage::parseTemperatureMessage()
 					     (sensor == 3) ? Database::SensorDewPointOutsideCh3 :
 					     Database::NumericSensorLast;
 	if (dewSensor != Database::NumericSensorLast) {
-	    m_db->addSensorValue(tempSensor, dewPoint);
+	    m_db->addSensorValue(dewSensor, dewPoint);
 	}
 
 	Database::NumericSensors humidSensor = (sensor == 0) ? Database::SensorHumidityInside :
@@ -226,7 +226,7 @@ WmrMessage::parseTemperatureMessage()
 					       (sensor == 3) ? Database::SensorHumidityOutsideCh3 :
 					       Database::NumericSensorLast;
 	if (humidSensor != Database::NumericSensorLast) {
-	    m_db->addSensorValue(tempSensor, humidity);
+	    m_db->addSensorValue(humidSensor, humidity);
 	}
     }
 }
