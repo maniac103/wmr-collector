@@ -26,7 +26,6 @@ class WmrMessage
 
     private:
 	bool checkValidityAndCopyData(const std::vector<uint8_t>& data);
-	float roundedValueFromRaw(uint8_t highByte, uint8_t lowByte, float factor, bool negative = false);
 
 	void parseFlags();
 	void parseTemperatureMessage();

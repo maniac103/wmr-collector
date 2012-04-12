@@ -168,24 +168,19 @@ WmrMessage::parseFlags()
     }
     if (m_type == msgTypeDateTime) {
 	bool externalPowerMissing = m_flags & 0x80;
-	bool dcfOk = m_flags & 0x20;
+	bool dcfSync = m_flags & 0x20;
+	bool dcfSignalOk = m_flags & 0x10;
 	if (debug) {
 	    if (!externalPowerMissing) {
 		debug << ", externally powered";
 	    }
-	    debug << ", DCF " << (dcfOk ? "" : "not ") << "synchronized";
+	    debug << ", DCF " << (dcfSync ? "" : "not ") << "synchronized";
+	    debug << ", DCF signal " << (dcfSignalOk ? "ok" : "weak");
 	}
     }
     if (debug) {
 	debug << std::endl;
     }
-}
-
-float
-WmrMessage::roundedValueFromRaw(uint8_t highByte, uint8_t lowByte, float factor, bool negative)
-{
-    unsigned int raw = (highByte << 8) + lowByte;
-    return (negative ? -factor : factor) * raw;
 }
 
 void
@@ -201,16 +196,25 @@ WmrMessage::parseTemperatureMessage()
     DebugStream& debug = Options::messageDebug();
     unsigned int sensor = m_data[0] & 0xf;
     unsigned int smiley = m_data[0] >> 6;
-    unsigned int trend = (m_data[0] >> 4) & 0x3;
+    unsigned int tempTrend = (m_flags >> 4) & 0x3;
+    unsigned int humidTrend = (m_data[0] >> 4) & 0x3;
     unsigned int humidity = m_data[3];
-    float temperature = roundedValueFromRaw(m_data[2] & 0x0f, m_data[1], 0.1f, (m_data[2] >> 4) != 0);
-    float dewPoint = roundedValueFromRaw(m_data[5] & 0x0f, m_data[4], 0.1f, (m_data[5] >> 4) != 0);
+    float temperature = 0.1f * (((m_data[2] & 0x0f) << 8) + m_data[1]);
+    float dewPoint = 0.1f * (((m_data[5] & 0x0f) << 8) + m_data[4]);
+
+    if (m_data[2] >> 4) {
+	temperature *= -1.0f;
+    }
+    if (m_data[5] >> 4) {
+	dewPoint *= -1.0f;
+    }
 
     if (debug) {
 	debug << "Sensor " << sensor << ": temperature " << temperature;
-	debug << "°C, dew point " << dewPoint << "°C, humidity ";
-	debug << humidity << "%, trend " << trendStrings[trend];
-	debug << ", smiley " << smileyStrings[smiley] << std::endl;
+	debug << "°C (trend: " << trendStrings[tempTrend];
+	debug << "), dew point " << dewPoint << "°C, humidity ";
+	debug << humidity << "% (trend: " << trendStrings[humidTrend];
+	debug << "), smiley " << smileyStrings[smiley] << std::endl;
     }
 
     if (m_db) {
@@ -247,10 +251,10 @@ void
 WmrMessage::parseRainMessage()
 {
     DebugStream& debug = Options::messageDebug();
-    float rate = roundedValueFromRaw(m_data[1], m_data[0], 0.01f * 25.4f);
-    float thisHour = roundedValueFromRaw(m_data[3], m_data[2], 0.01f * 25.4f);
-    float thisDay = roundedValueFromRaw(m_data[5], m_data[4], 0.01f * 25.4f);
-    float total = roundedValueFromRaw(m_data[7], m_data[6], 0.01f * 25.4f);
+    float rate = 0.01f * 25.4f * ((m_data[1] << 8) + m_data[0]);
+    float thisHour = 0.01f * 25.4f * ((m_data[3] << 8) + m_data[2]);
+    float thisDay = 0.01f * 25.4f * ((m_data[5] << 8) + m_data[4]);
+    float total = 0.01f * 25.4f * ((m_data[7] << 8) + m_data[6]);
 
     if (debug) {
 	debug << "Rain: rate " << rate << ", this hour " << thisHour;
@@ -283,24 +287,21 @@ WmrMessage::parsePressureMessage()
     };
 
     DebugStream& debug = Options::messageDebug();
-    unsigned int pressure = ((m_data[1] & 0xf) << 8) + m_data[0];
-    unsigned int altPressure = ((m_data[3] & 0xf) << 8) + m_data[2];
-    unsigned int forecast = m_data[1] >> 4;
-    unsigned int altForecast = m_data[3] >> 4;
+    unsigned int absPressure = ((m_data[1] & 0xf) << 8) + m_data[0];
+    unsigned int relPressure = ((m_data[3] & 0xf) << 8) + m_data[2];
+    unsigned int absForecast = m_data[1] >> 4;
+    unsigned int relForecast = m_data[3] >> 4;
 
     if (debug) {
-	const char *forecastString = forecastStrings[forecast];
-	const char *altForecastString = forecastStrings[altForecast];
-
 	debug << std::dec;
-	debug << "Pressure: sea level " << pressure;
-	debug << " mbar, altitude " << altPressure << " mbar" << std::endl;
-	debug << "Forecast: sea level " << forecastString;
-	debug << ", altitude " << altForecastString << std::endl;
+	debug << "Absolute pressure: " << absPressure << " mbar (forecast: ";
+	debug << forecastStrings[absForecast] << ")" << std::endl;
+	debug << "Relative pressure: " << relPressure << " mbar (forecast: ";
+	debug << forecastStrings[relForecast] << ")" << std::endl;
     }
 
     if (m_db) {
-	m_db->addSensorValue(Database::SensorAirPressure, altPressure);
+	m_db->addSensorValue(Database::SensorAirPressure, relPressure);
     }
 }
 
@@ -315,12 +316,12 @@ WmrMessage::parseWindMessage()
     DebugStream& debug = Options::messageDebug();
     uint8_t direction = m_data[0] & 0x0f;
     float degrees = 360.0f * direction / 16.0f;
-    float avgSpeed = 0.1f * (m_data[4] << 4 + m_data[3] >> 4);
-    float gustSpeed = roundedValueFromRaw(m_data[3] & 0x0f, m_data[2], 0.1f);
+    float avgSpeed = 0.1f * ((m_data[4] << 4) + (m_data[3] >> 4));
+    float gustSpeed = 0.1f * (((m_data[3] & 0x0f) << 8) + m_data[2]);
     float windChill;
 
     if (m_data[6] != 0x20) {
-	windChill = roundedValueFromRaw(m_data[6] & 0x0f, m_data[5], 0.1f);
+	windChill = m_data[5];
     } else {
 	windChill = NAN;
     }
@@ -367,11 +368,13 @@ WmrMessage::parseDateTimeMessage()
     DebugStream& debug = Options::dataDebug();
 
     if (debug) {
+	int timezone = (m_data[7] >= 128) ? 128 - m_data[7] : m_data[7];
 	debug << "Date = " << std::setw(2) << std::setfill('0') << DEC(m_data[4]);
 	debug << "." << std::setw(2) << std::setfill('0') << DEC(m_data[5]);
 	debug << "." << DEC(2000 + m_data[6]) << std::endl;
 	debug << "Time = " << std::setw(2) << std::setfill('0') << DEC(m_data[3]);
 	debug << ":" << std::setw(2) << std::setfill('0') << DEC(m_data[2]);
+	debug << " (GMT" << (timezone >= 0 ? "+" : "") << timezone << ")";
 	debug << std::endl;
     }
 }
