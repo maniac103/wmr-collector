@@ -180,25 +180,36 @@ WmrMessage::parseFlags()
     }
 }
 
+float
+WmrMessage::roundedValueFromRaw(uint8_t highByte, uint8_t lowByte, float factor, bool negative)
+{
+    unsigned int raw = (highByte << 8) + lowByte;
+    return (negative ? -factor : factor) * raw;
+}
+
 void
 WmrMessage::parseTemperatureMessage()
 {
+    static const char *trendStrings[] = {
+	"steady", "rising", "falling", "???"
+    };
+    static const char *smileyStrings[] = {
+	"   ", ":-)", ":-(", ":-|"
+    };
+
     DebugStream& debug = Options::messageDebug();
     unsigned int sensor = m_data[0] & 0xf;
     unsigned int smiley = m_data[0] >> 6;
     unsigned int trend = (m_data[0] >> 4) & 0x3;
-    unsigned int temperatureRaw = ((m_data[2] & 0x0f) << 8) + m_data[1];
-    bool temperatureNegative = (m_data[2] >> 4) != 0;
-    float temperature = (temperatureNegative ? -0.1f : 0.1f) * temperatureRaw;
     unsigned int humidity = m_data[3];
-    unsigned int dewPointRaw = ((m_data[5] & 0x0f) << 8) + m_data[4];
-    bool dewPointNegative = (m_data[5] >> 4) != 0;
-    float dewPoint = (dewPointNegative ? -0.1f : 0.1f) * dewPointRaw;
+    float temperature = roundedValueFromRaw(m_data[2] & 0x0f, m_data[1], 0.1f, (m_data[2] >> 4) != 0);
+    float dewPoint = roundedValueFromRaw(m_data[5] & 0x0f, m_data[4], 0.1f, (m_data[5] >> 4) != 0);
 
     if (debug) {
 	debug << "Sensor " << sensor << ": temperature " << temperature;
 	debug << "°C, dew point " << dewPoint << "°C, humidity ";
-	debug << humidity << "%, smiley " << smiley << ", trend " << trend << std::endl;
+	debug << humidity << "%, trend " << trendStrings[trend];
+	debug << ", smiley " << smileyStrings[smiley] << std::endl;
     }
 
     if (m_db) {
@@ -235,10 +246,10 @@ void
 WmrMessage::parseRainMessage()
 {
     DebugStream& debug = Options::messageDebug();
-    float rate = 0.01f * 25.4f * ((m_data[1] << 8) + m_data[0]);
-    float thisHour = 0.01f * 25.4f * ((m_data[3] << 8) + m_data[2]);
-    float thisDay = 0.01f * 25.4f * ((m_data[5] << 8) + m_data[4]);
-    float total = 0.01f * 25.4f * ((m_data[7] << 8) + m_data[6]);
+    float rate = roundedValueFromRaw(m_data[1], m_data[0], 0.01f * 25.4f);
+    float thisHour = roundedValueFromRaw(m_data[3], m_data[2], 0.01f * 25.4f);
+    float thisDay = roundedValueFromRaw(m_data[5], m_data[4], 0.01f * 25.4f);
+    float total = roundedValueFromRaw(m_data[7], m_data[6], 0.01f * 25.4f);
 
     if (debug) {
 	debug << "Rain: rate " << rate << ", this hour " << thisHour;
@@ -259,6 +270,17 @@ WmrMessage::parseRainMessage()
 void
 WmrMessage::parsePressureMessage()
 {
+    static const char *forecastStrings[] = {
+	"partly cloudy", /* day */	"rainy",
+	"cloudy",			"sunny", /* day */
+	"clear", /* night */		"snowy",
+	"partly cloudy", /* night */	"???",
+	"???",				"???",
+	"???",				"???",
+	"???",				"???",
+	"???",				"???"
+    };
+
     DebugStream& debug = Options::messageDebug();
     unsigned int pressure = ((m_data[1] & 0xf) << 8) + m_data[0];
     unsigned int altPressure = ((m_data[3] & 0xf) << 8) + m_data[2];
@@ -266,11 +288,14 @@ WmrMessage::parsePressureMessage()
     unsigned int altForecast = m_data[3] >> 4;
 
     if (debug) {
+	const char *forecastString = forecastStrings[forecast];
+	const char *altForecastString = forecastStrings[altForecast];
+
 	debug << std::dec;
 	debug << "Pressure: sea level " << pressure;
 	debug << " mbar, altitude " << altPressure << " mbar" << std::endl;
-	debug << "Forecast: sea level " << forecast;
-	debug << ", altitude " << altForecast << std::endl;
+	debug << "Forecast: sea level " << forecastString;
+	debug << ", altitude " << altForecastString << std::endl;
     }
 
     if (m_db) {
@@ -281,16 +306,35 @@ WmrMessage::parsePressureMessage()
 void
 WmrMessage::parseWindMessage()
 {
+    static const char *directionStrings[] = {
+	"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+	"S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"
+    };
+
     DebugStream& debug = Options::messageDebug();
     uint8_t direction = m_data[0] & 0x0f;
     float degrees = 360.0f * direction / 16.0f;
-    float avgSpeed = 0.1f * ((m_data[4] << 4) + (m_data[3] >> 4));
-    float gustSpeed = 0.1f * (((m_data[3] & 0x0f) << 8) + m_data[2]);
+    float avgSpeed = roundedValueFromRaw(m_data[4] << 4, m_data[3] >> 4, 0.1f);
+    float gustSpeed = roundedValueFromRaw(m_data[3] & 0x0f, m_data[2], 0.1f);
+    float windChill;
+
+    if (m_data[6] != 0x20) {
+	windChill = (roundedValueFromRaw(m_data[6] & 0x0f, m_data[5], 0.1f) - 32) / 1.8f;
+    } else {
+	windChill = NAN;
+    }
 
     if (debug) {
-	debug << "Wind direction " << HEX(direction);
+	debug << "Wind direction " << directionStrings[direction];
 	debug << " -> " << degrees << "°, speed avg. ";
 	debug << avgSpeed << " m/s, gust " << gustSpeed << " m/s" << std::endl;
+	debug << "Wind chill temperature ";
+	if (isnan(windChill)) {
+	    debug << "n/a";
+	} else {
+	    debug << windChill << " °C";
+	}
+	debug << std::endl;
     }
 
     if (m_db) {
