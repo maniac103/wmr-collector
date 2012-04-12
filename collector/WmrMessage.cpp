@@ -315,12 +315,12 @@ WmrMessage::parseWindMessage()
     DebugStream& debug = Options::messageDebug();
     uint8_t direction = m_data[0] & 0x0f;
     float degrees = 360.0f * direction / 16.0f;
-    float avgSpeed = roundedValueFromRaw(m_data[4] << 4, m_data[3] >> 4, 0.1f);
+    float avgSpeed = 0.1f * (m_data[4] << 4 + m_data[3] >> 4);
     float gustSpeed = roundedValueFromRaw(m_data[3] & 0x0f, m_data[2], 0.1f);
     float windChill;
 
     if (m_data[6] != 0x20) {
-	windChill = (roundedValueFromRaw(m_data[6] & 0x0f, m_data[5], 0.1f) - 32) / 1.8f;
+	windChill = roundedValueFromRaw(m_data[6] & 0x0f, m_data[5], 0.1f);
     } else {
 	windChill = NAN;
     }
