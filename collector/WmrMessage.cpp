@@ -268,7 +268,8 @@ WmrMessage::parseRainMessage()
     }
 
     if (m_db) {
-	m_db->addSensorValue(Database::SensorRainfall, rate);
+	m_db->addSensorValue(Database::SensorRainRate, rate);
+	m_db->addSensorValue(Database::SensorRainAmount, total);
     }
 }
 

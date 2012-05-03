@@ -1,9 +1,12 @@
 #ifndef __DATABASE_H__
 #define __DATABASE_H__
 
+#include <time.h>
+#include <string>
+
 class Database {
     protected:
-	Database() { };
+	Database();
     public:
 	~Database() { };
 
@@ -26,7 +29,8 @@ class Database {
 	    SensorWindSpeedAvg = 45,
 	    SensorWindSpeedGust = 46,
 	    SensorWindDirection = 47,
-	    SensorRainfall = 51,
+	    SensorRainRate = 51,
+	    SensorRainAmount = 52,
 	    /* not valid for DB */
 	    NumericSensorLast = 255
 	} NumericSensors;
@@ -44,6 +48,16 @@ class Database {
 	virtual void addSensorValue(NumericSensors sensor, float value) {}
 	virtual void addSensorValue(BooleanSensors sensor, bool value) {}
 	virtual void addSensorValue(StateSensors sensor, const std::string& value) {}
+
+    protected:
+	float convertRainAmountValue(float value);
+
+    private:
+	float m_lastRainAmount;
+	float m_lastRainDelta;
+	time_t m_lastRainAmountUpdateTime;
+
+	static const unsigned long rainAmountCollectionTime = 15 * 60; /* collect for 15 minutes */
 
     protected:
 	static const unsigned int sensorTypeNumeric = 1;

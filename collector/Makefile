@@ -1,7 +1,7 @@
 CC = g++
 CFLAGS = -Wall -c -O2 -I/usr/include/mysql -std=c++0x
 LIBS = -lpthread -lboost_system -lboost_thread-mt -lboost_program_options -lmysqlpp
-SRCS = main.cpp IoHandler.cpp WmrMessage.cpp MysqlDatabase.cpp Options.cpp PidFile.cpp
+SRCS = main.cpp IoHandler.cpp WmrMessage.cpp Database.cpp MysqlDatabase.cpp Options.cpp PidFile.cpp
 OBJS = $(SRCS:%.cpp=%.o)
 DEPFILE = .depend
 PROG = wmrcollector

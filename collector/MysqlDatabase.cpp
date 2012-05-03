@@ -193,7 +193,8 @@ MysqlDatabase::createSensorRows()
     query.execute(SensorWindSpeedAvg, sensorTypeNumeric, "Windgeschwindigkeit", readingTypeSpeed, "m/s", 1);
     query.execute(SensorWindSpeedGust, sensorTypeNumeric, "Spitzenwindgeschwindigkeit", readingTypeSpeed, "m/s", 1);
     query.execute(SensorWindDirection, sensorTypeNumeric, "Windrichtung", readingTypeNone, "°", 1);
-    query.execute(SensorRainfall, sensorTypeNumeric, "Regenmenge", readingTypeVolume, "mm", 1);
+    query.execute(SensorRainRate, sensorTypeNumeric, "Regenrate", readingTypeVolume, "mm/h", 1);
+    query.execute(SensorRainAmount, sensorTypeNumeric, "Regenmenge", readingTypeVolume, "mm", 1);
 }
 
 bool
@@ -214,6 +215,10 @@ MysqlDatabase::executeQuery(mysqlpp::Query& query)
 void
 MysqlDatabase::addSensorValue(NumericSensors sensor, float value)
 {
+    if (sensor == SensorRainAmount) {
+	value = convertRainAmountValue(value);
+    }
+
     Database::addSensorValue(sensor, value);
 
     if (m_connection) {
