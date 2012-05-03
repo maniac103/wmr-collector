@@ -12,13 +12,18 @@ IoHandler::IoHandler(const std::string& host, const std::string& port, boost::sh
     m_db(db),
     m_active(true)
 {
+    boost::system::error_code error;
     boost::asio::ip::tcp::resolver resolver(*this);
     boost::asio::ip::tcp::resolver::query query(host, port);
-    boost::asio::ip::tcp::resolver::iterator endpoint = resolver.resolve(query);
+    boost::asio::ip::tcp::resolver::iterator endpoint = resolver.resolve(query, error);
 
-    m_socket.async_connect(*endpoint,
-			   boost::bind(&IoHandler::handleConnect, this,
-				       boost::asio::placeholders::error));
+    if (error) {
+	doClose(error);
+    } else {
+	m_socket.async_connect(*endpoint,
+			       boost::bind(&IoHandler::handleConnect, this,
+					   boost::asio::placeholders::error));
+    }
 
     /* pre-alloc buffer to avoid reallocations */
     m_data.reserve(64);
