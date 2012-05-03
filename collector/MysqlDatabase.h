@@ -3,6 +3,7 @@
 
 #include <map>
 #include <queue>
+#include <mysql++/mysql++.h>
 #include <mysql++/connection.h>
 #include <mysql++/query.h>
 #include "Database.h"
@@ -23,6 +24,7 @@ class MysqlDatabase : public virtual Database {
 	bool createTables();
 	void createSensorRows();
 	bool executeQuery(mysqlpp::Query& query);
+	void updateRowEndTime(const char *table, mysqlpp::ulonglong id, mysqlpp::sql_datetime& timestamp);
 
     private:
 	static const char *dbName;

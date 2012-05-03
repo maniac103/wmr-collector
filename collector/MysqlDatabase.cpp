@@ -35,6 +35,19 @@ MysqlDatabase::MysqlDatabase() :
 MysqlDatabase::~MysqlDatabase()
 {
     if (m_connection) {
+	time_t now = time(NULL);
+	mysqlpp::sql_datetime timestamp(now);
+
+	for (auto iter = m_lastInsertIds.begin(); iter != m_lastInsertIds.end(); ++iter) {
+	    if (iter->first < NumericSensorLast) {
+		updateRowEndTime(numericTableName, iter->second, timestamp);
+	    } else if (iter->first < BooleanSensorLast) {
+		updateRowEndTime(booleanTableName, iter->second, timestamp);
+	    } else if (iter->first < StateSensorLast) {
+		updateRowEndTime(stateTableName, iter->second, timestamp);
+	    }
+	}
+
 	delete m_connection;
     }
 }
@@ -223,7 +236,6 @@ MysqlDatabase::addSensorValue(NumericSensors sensor, float value)
 
     if (m_connection) {
 	time_t now = time(NULL);
-	mysqlpp::Query query = m_connection->query();
 	std::map<unsigned int, float>::iterator cacheIter = m_numericCache.find(sensor);
 	std::map<unsigned int, mysqlpp::ulonglong>::iterator idIter = m_lastInsertIds.find(sensor);
 	bool valueChanged = cacheIter == m_numericCache.end() || cacheIter->second != value;
@@ -231,13 +243,13 @@ MysqlDatabase::addSensorValue(NumericSensors sensor, float value)
 	mysqlpp::sql_datetime timestamp(now);
 
 	if (idValid) {
-	    query << "update " << numericTableName << " set endtime ='" << timestamp
-		  << "' where id = " << idIter->second;
-	    executeQuery(query);
+	    updateRowEndTime(numericTableName, idIter->second, timestamp);
 	}
 
 	if (!isnan(value) && (valueChanged || !idValid)) {
+	    mysqlpp::Query query = m_connection->query();
 	    NumericSensorValue row(sensor, value, timestamp, timestamp);
+
 	    query.insert(row);
 	    if (executeQuery(query)) {
 		m_lastInsertIds[sensor] = query.insert_id();
@@ -254,7 +266,6 @@ MysqlDatabase::addSensorValue(BooleanSensors sensor, bool value)
 
     if (m_connection) {
 	time_t now = time(NULL);
-	mysqlpp::Query query = m_connection->query();
 	std::map<unsigned int, bool>::iterator cacheIter = m_booleanCache.find(sensor);
 	std::map<unsigned int, mysqlpp::ulonglong>::iterator idIter = m_lastInsertIds.find(sensor);
 	bool valueChanged = cacheIter == m_booleanCache.end() || cacheIter->second != value;
@@ -262,13 +273,13 @@ MysqlDatabase::addSensorValue(BooleanSensors sensor, bool value)
 	mysqlpp::sql_datetime timestamp(now);
 
 	if (idValid) {
-	    query << "update " << booleanTableName << " set endtime ='" << timestamp
-		  << "' where id = " << idIter->second;
-	    executeQuery(query);
+	    updateRowEndTime(booleanTableName, idIter->second, timestamp);
 	}
 
 	if (valueChanged || !idValid) {
+	    mysqlpp::Query query = m_connection->query();
 	    BooleanSensorValue row(sensor, value, timestamp, timestamp);
+
 	    query.insert(row);
 	    if (executeQuery(query)) {
 		m_lastInsertIds[sensor] = query.insert_id();
@@ -285,7 +296,6 @@ MysqlDatabase::addSensorValue(StateSensors sensor, const std::string& value)
 
     if (m_connection) {
 	time_t now = time(NULL);
-	mysqlpp::Query query = m_connection->query();
 	std::map<unsigned int, std::string>::iterator cacheIter = m_stateCache.find(sensor);
 	std::map<unsigned int, mysqlpp::ulonglong>::iterator idIter = m_lastInsertIds.find(sensor);
 	bool valueChanged = cacheIter == m_stateCache.end() || cacheIter->second != value;
@@ -293,13 +303,13 @@ MysqlDatabase::addSensorValue(StateSensors sensor, const std::string& value)
 	mysqlpp::sql_datetime timestamp(now);
 
 	if (idValid) {
-	    query << "update " << stateTableName << " set endtime ='" << timestamp
-		  << "' where id = " << idIter->second;
-	    executeQuery(query);
+	    updateRowEndTime(stateTableName, idIter->second, timestamp);
 	}
 
 	if (valueChanged || !idValid) {
+	    mysqlpp::Query query = m_connection->query();
 	    StateSensorValue row(sensor, value, timestamp, timestamp);
+
 	    query.insert(row);
 	    if (executeQuery(query)) {
 		m_lastInsertIds[sensor] = query.insert_id();
@@ -307,5 +317,17 @@ MysqlDatabase::addSensorValue(StateSensors sensor, const std::string& value)
 	    }
 	}
     }
+}
+
+void
+MysqlDatabase::updateRowEndTime(const char *table,
+				mysqlpp::ulonglong id,
+				mysqlpp::sql_datetime& timestamp)
+{
+    mysqlpp::Query query = m_connection->query();
+
+    query << "update " << table << " set endtime ='" << timestamp
+	  << "' where id = " << id;
+    executeQuery(query);
 }
 

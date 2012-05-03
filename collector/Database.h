@@ -32,17 +32,17 @@ class Database {
 	    SensorRainRate = 51,
 	    SensorRainAmount = 52,
 	    /* not valid for DB */
-	    NumericSensorLast = 255
+	    NumericSensorLast = 512
 	} NumericSensors;
 
 	typedef enum {
 	    /* not valid for DB */
-	    BooleanSensorLast = 1
+	    BooleanSensorLast = 1024
 	} BooleanSensors;
 
 	typedef enum {
 	    /* not valid for DB */
-	    StateSensorLast = 1
+	    StateSensorLast = 1536
 	} StateSensors;
 
 	virtual void addSensorValue(NumericSensors sensor, float value) {}
