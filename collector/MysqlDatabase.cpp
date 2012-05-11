@@ -208,6 +208,7 @@ MysqlDatabase::createSensorRows()
     query.execute(SensorWindDirection, sensorTypeNumeric, "Windrichtung", readingTypeNone, "°", 1);
     query.execute(SensorRainRate, sensorTypeNumeric, "Regenrate", readingTypeVolume, "mm/h", 1);
     query.execute(SensorRainAmount, sensorTypeNumeric, "Regenmenge", readingTypeVolume, "mm", 1);
+    query.execute(SensorRainTotalSum, sensorTypeNumeric, "Regensumme", readingTypeVolume, "mm", 1);
 }
 
 bool

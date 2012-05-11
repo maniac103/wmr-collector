@@ -31,6 +31,7 @@ class Database {
 	    SensorWindDirection = 47,
 	    SensorRainRate = 51,
 	    SensorRainAmount = 52,
+	    SensorRainTotalSum = 53,
 	    /* not valid for DB */
 	    NumericSensorLast = 512
 	} NumericSensors;
