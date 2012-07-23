@@ -58,7 +58,7 @@ class Database {
 	float m_lastRainDelta;
 	time_t m_lastRainAmountUpdateTime;
 
-	static const unsigned long rainAmountCollectionTime = 60 * 60; /* collect for 1 hour */
+	static const unsigned long rainAmountCollectionTime = 15 * 60; /* collect for 15 minutes */
 
     protected:
 	static const unsigned int sensorTypeNumeric = 1;
