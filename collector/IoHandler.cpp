@@ -9,6 +9,7 @@ IoHandler::IoHandler(const std::string& host, const std::string& port, boost::sh
     m_state(StartMarker),
     m_pos(0),
     m_socket(*this),
+    m_watchdog(*this),
     m_db(db),
     m_active(true)
 {
@@ -42,7 +43,24 @@ IoHandler::handleConnect(const boost::system::error_code& error)
     if (error) {
 	doClose(error);
     } else {
+	resetWatchdog();
 	readStart();
+    }
+}
+
+void
+IoHandler::resetWatchdog()
+{
+    m_watchdog.expires_from_now(boost::posix_time::minutes(5));
+    m_watchdog.async_wait(boost::bind(&IoHandler::watchdogTimeout, this,
+				      boost::asio::placeholders::error));
+}
+
+void
+IoHandler::watchdogTimeout(const boost::system::error_code& error)
+{
+    if (error != boost::asio::error::operation_aborted) {
+	doClose(error);
     }
 }
 
@@ -57,6 +75,8 @@ IoHandler::readComplete(const boost::system::error_code& error,
 	doClose(error);
 	return;
     }
+
+    resetWatchdog();
 
     if (debug) {
 	debug << "IO: Got bytes ";

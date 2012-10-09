@@ -37,6 +37,8 @@ class IoHandler : public boost::asio::io_service
 	void handleConnect(const boost::system::error_code& error);
 	void readComplete(const boost::system::error_code& error, size_t bytesTransferred);
 	void doClose(const boost::system::error_code& error);
+	void resetWatchdog();
+	void watchdogTimeout(const boost::system::error_code& error);
 
     private:
 	enum {
@@ -48,6 +50,7 @@ class IoHandler : public boost::asio::io_service
 
 	size_t m_pos;
 	boost::asio::ip::tcp::socket m_socket;
+	boost::asio::deadline_timer m_watchdog;
 	boost::shared_ptr<Database> m_db;
 	bool m_active;
 	unsigned char m_recvBuffer[maxReadLength];

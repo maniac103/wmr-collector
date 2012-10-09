@@ -11,7 +11,7 @@
 class MysqlDatabase : public virtual Database {
     public:
 	MysqlDatabase();
-	~MysqlDatabase();
+	virtual ~MysqlDatabase();
 
     public:
 	bool connect(const std::string& server, const std::string& user, const std::string& password);
