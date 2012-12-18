@@ -1,10 +1,9 @@
 CC = gcc
 CFLAGS = -Wall -c -O2
-LIBS =
 SRCS = forwarder.c
 OBJS = $(SRCS:%.c=%.o)
 DEPFILE = .depend
-PROG = wmrforwarder
+PROG = wmr-forwarder
 
 all: $(PROG)
 
@@ -19,8 +18,8 @@ $(DEPFILE): $(SRCS)
 -include $(DEPFILE)
 
 $(PROG): $(OBJS) $(DEPFILE) Makefile
-	$(CC) $(LIBS) -o $(PROG) $(OBJS)
+	$(CC) $(LDFLAGS) $(OBJS) -o $@
 
 %.o: %.c
-	$(CC) $(CFLAGS) $<
+	$(CC) $(CFLAGS) -c $^ -o $@
 
