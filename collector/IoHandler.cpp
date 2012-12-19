@@ -164,4 +164,5 @@ IoHandler::doClose(const boost::system::error_code& error)
 
     m_socket.close();
     m_active = false;
+    stop();
 }
