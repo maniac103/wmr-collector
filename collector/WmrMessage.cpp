@@ -237,13 +237,15 @@ WmrMessage::parseTemperatureMessage()
     }
 
     if (m_db) {
+	time_t interval = (sensor == 0) ? 15 : 60;
+
 	Database::NumericSensors tempSensor = (sensor == 0) ? Database::SensorTempInside :
 					      (sensor == 1) ? Database::SensorTempOutsideCh1 :
 					      (sensor == 2) ? Database::SensorTempOutsideCh2 :
 					      (sensor == 3) ? Database::SensorTempOutsideCh3 :
 					      Database::NumericSensorLast;
 	if (tempSensor != Database::NumericSensorLast) {
-	    m_db->addSensorValue(tempSensor, temperature);
+	    m_db->addSensorValue(tempSensor, temperature, interval);
 	}
 
 	Database::NumericSensors dewSensor = (sensor == 0) ? Database::SensorDewPointInside :
@@ -252,7 +254,7 @@ WmrMessage::parseTemperatureMessage()
 					     (sensor == 3) ? Database::SensorDewPointOutsideCh3 :
 					     Database::NumericSensorLast;
 	if (dewSensor != Database::NumericSensorLast) {
-	    m_db->addSensorValue(dewSensor, dewPoint);
+	    m_db->addSensorValue(dewSensor, dewPoint, interval);
 	}
 
 	Database::NumericSensors humidSensor = (sensor == 0) ? Database::SensorHumidityInside :
@@ -261,7 +263,7 @@ WmrMessage::parseTemperatureMessage()
 					       (sensor == 3) ? Database::SensorHumidityOutsideCh3 :
 					       Database::NumericSensorLast;
 	if (humidSensor != Database::NumericSensorLast) {
-	    m_db->addSensorValue(humidSensor, humidity);
+	    m_db->addSensorValue(humidSensor, humidity, interval);
 	}
     }
 }
@@ -287,9 +289,10 @@ WmrMessage::parseRainMessage()
     }
 
     if (m_db) {
-	m_db->addSensorValue(Database::SensorRainRate, rate);
-	m_db->addSensorValue(Database::SensorRainAmount, total);
-	m_db->addSensorValue(Database::SensorRainTotalSum, total);
+	static const time_t interval = 70;
+	m_db->addSensorValue(Database::SensorRainRate, rate, interval);
+	m_db->addSensorValue(Database::SensorRainAmount, total, interval);
+	m_db->addSensorValue(Database::SensorRainTotalSum, total, interval);
     }
 }
 
@@ -322,7 +325,8 @@ WmrMessage::parsePressureMessage()
     }
 
     if (m_db) {
-	m_db->addSensorValue(Database::SensorAirPressure, relPressure);
+	static const time_t interval = 60;
+	m_db->addSensorValue(Database::SensorAirPressure, relPressure, interval);
     }
 }
 
@@ -361,11 +365,12 @@ WmrMessage::parseWindMessage()
     }
 
     if (m_db) {
-	m_db->addSensorValue(Database::SensorWindSpeedAvg, avgSpeed);
+	static const time_t interval = 48;
+	m_db->addSensorValue(Database::SensorWindSpeedAvg, avgSpeed, interval);
 	if (avgSpeed != gustSpeed) {
-	    m_db->addSensorValue(Database::SensorWindSpeedGust, gustSpeed);
+	    m_db->addSensorValue(Database::SensorWindSpeedGust, gustSpeed, interval);
 	}
-	m_db->addSensorValue(Database::SensorWindDirection, degrees);
+	m_db->addSensorValue(Database::SensorWindDirection, degrees, interval);
     }
 }
 
@@ -379,7 +384,8 @@ WmrMessage::parseUVMessage()
 	debug << "UV level: " << level << std::endl;
     }
     if (m_db) {
-	m_db->addSensorValue(Database::SensorUVLevel, (float) level);
+	static const time_t interval = 60;
+	m_db->addSensorValue(Database::SensorUVLevel, (float) level, interval);
     }
 }
 

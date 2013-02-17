@@ -35,7 +35,7 @@ class MysqlDatabase : public virtual Database {
     public:
 	bool connect(const std::string& server, const std::string& user, const std::string& password);
 
-	virtual void addSensorValue(NumericSensors sensor, float value);
+	virtual void addSensorValue(NumericSensors sensor, float value, time_t normalInterval);
 
     private:
 	bool createTables();
@@ -47,7 +47,7 @@ class MysqlDatabase : public virtual Database {
 	static const char *dbName;
 	static const char *numericTableName;
 
-	std::map<unsigned int, float> m_numericCache;
+	std::map<unsigned int, std::pair<float, time_t> > m_numericCache;
 	std::map<unsigned int, mysqlpp::ulonglong> m_lastInsertIds;
 	mysqlpp::Connection *m_connection;
 };

@@ -55,7 +55,7 @@ class Database {
 	    NumericSensorLast = 512
 	} NumericSensors;
 
-	virtual void addSensorValue(NumericSensors sensor, float value) {}
+	virtual void addSensorValue(NumericSensors sensor, float value, time_t normalInterval) {}
 
     protected:
 	float convertRainAmountValue(float value);

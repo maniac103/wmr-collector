@@ -202,19 +202,25 @@ MysqlDatabase::executeQuery(mysqlpp::Query& query)
 }
 
 void
-MysqlDatabase::addSensorValue(NumericSensors sensor, float value)
+MysqlDatabase::addSensorValue(NumericSensors sensor, float value, time_t normalInterval)
 {
     if (sensor == SensorRainAmount) {
 	value = convertRainAmountValue(value);
     }
 
-    Database::addSensorValue(sensor, value);
+    Database::addSensorValue(sensor, value, normalInterval);
 
     if (m_connection) {
 	time_t now = time(NULL);
-	std::map<unsigned int, float>::iterator cacheIter = m_numericCache.find(sensor);
+	std::map<unsigned int, std::pair<float, time_t> >::iterator cacheIter = m_numericCache.find(sensor);
+
+	if (cacheIter != m_numericCache.end() && (now - cacheIter->second.second) > (2 * normalInterval)) {
+	    m_numericCache.erase(cacheIter);
+	    cacheIter = m_numericCache.end();
+	}
+
 	std::map<unsigned int, mysqlpp::ulonglong>::iterator idIter = m_lastInsertIds.find(sensor);
-	bool valueChanged = cacheIter == m_numericCache.end() || cacheIter->second != value;
+	bool valueChanged = cacheIter == m_numericCache.end() || cacheIter->second.first != value;
 	bool idValid = idIter != m_lastInsertIds.end() && idIter->second != 0;
 	mysqlpp::sql_datetime timestamp(now);
 
@@ -229,7 +235,7 @@ MysqlDatabase::addSensorValue(NumericSensors sensor, float value)
 	    query.insert(row);
 	    if (executeQuery(query)) {
 		m_lastInsertIds[sensor] = query.insert_id();
-		m_numericCache[sensor] = value;
+		m_numericCache[sensor] = std::make_pair(value, now);
 	    }
 	}
     }
