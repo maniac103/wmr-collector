@@ -55,19 +55,7 @@ class Database {
 	    NumericSensorLast = 512
 	} NumericSensors;
 
-	typedef enum {
-	    /* not valid for DB */
-	    BooleanSensorLast = 1024
-	} BooleanSensors;
-
-	typedef enum {
-	    /* not valid for DB */
-	    StateSensorLast = 1536
-	} StateSensors;
-
 	virtual void addSensorValue(NumericSensors sensor, float value) {}
-	virtual void addSensorValue(BooleanSensors sensor, bool value) {}
-	virtual void addSensorValue(StateSensors sensor, const std::string& value) {}
 
     protected:
 	float convertRainAmountValue(float value);
@@ -77,12 +65,10 @@ class Database {
 	float m_lastRainDelta;
 	time_t m_lastRainAmountUpdateTime;
 
-	static const unsigned long rainAmountCollectionTime = 15 * 60; /* collect for 15 minutes */
+	static const long rainAmountCollectionTime = 15 * 60; /* collect for 15 minutes */
 
     protected:
 	static const unsigned int sensorTypeNumeric = 1;
-	static const unsigned int sensorTypeBoolean = 2;
-	static const unsigned int sensorTypeState = 3;
 
 	static const unsigned int readingTypeNone = 0;
 	static const unsigned int readingTypeTemperature = 1;

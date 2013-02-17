@@ -26,22 +26,10 @@
 
 const char * MysqlDatabase::dbName = "wmr_data";
 const char * MysqlDatabase::numericTableName = "numeric_data";
-const char * MysqlDatabase::booleanTableName = "boolean_data";
-const char * MysqlDatabase::stateTableName = "state_data";
 
 sql_create_4(NumericSensorValue, 1, 4,
 	     mysqlpp::sql_smallint, sensor,
 	     mysqlpp::sql_float, value,
-	     mysqlpp::sql_datetime, starttime,
-	     mysqlpp::sql_datetime, endtime);
-sql_create_4(BooleanSensorValue, 1, 4,
-	     mysqlpp::sql_smallint, sensor,
-	     mysqlpp::sql_bool, value,
-	     mysqlpp::sql_datetime, starttime,
-	     mysqlpp::sql_datetime, endtime);
-sql_create_4(StateSensorValue, 1, 4,
-	     mysqlpp::sql_smallint, sensor,
-	     mysqlpp::sql_varchar, value,
 	     mysqlpp::sql_datetime, starttime,
 	     mysqlpp::sql_datetime, endtime);
 
@@ -60,10 +48,6 @@ MysqlDatabase::~MysqlDatabase()
 	for (auto iter = m_lastInsertIds.begin(); iter != m_lastInsertIds.end(); ++iter) {
 	    if (iter->first < NumericSensorLast) {
 		updateRowEndTime(numericTableName, iter->second, timestamp);
-	    } else if (iter->first < BooleanSensorLast) {
-		updateRowEndTime(booleanTableName, iter->second, timestamp);
-	    } else if (iter->first < StateSensorLast) {
-		updateRowEndTime(stateTableName, iter->second, timestamp);
 	    }
 	}
 
@@ -86,8 +70,6 @@ MysqlDatabase::connect(const std::string& server, const std::string& user, const
     }
 
     NumericSensorValue::table(numericTableName);
-    BooleanSensorValue::table(booleanTableName);
-    StateSensorValue::table(stateTableName);
 
     try {
 	m_connection->select_db(dbName);
@@ -148,32 +130,6 @@ MysqlDatabase::createTables()
 	      << "  id INT AUTO_INCREMENT, "
 	      << "  sensor SMALLINT UNSIGNED NOT NULL, "
 	      << "  value FLOAT NOT NULL, "
-	      << "  starttime DATETIME NOT NULL, "
-	      << "  endtime DATETIME NOT NULL, "
-	      << "  PRIMARY KEY (id), "
-	      << "  KEY sensor_starttime (sensor, starttime), "
-	      << "  KEY sensor_endtime (sensor, endtime)) "
-	      << "ENGINE MyISAM PACK_KEYS 1 ROW_FORMAT DYNAMIC";
-	query.execute();
-
-	/* Create boolean sensor data table */
-	query << "CREATE TABLE IF NOT EXISTS " << booleanTableName << " ("
-	      << "  id INT AUTO_INCREMENT, "
-	      << "  sensor SMALLINT UNSIGNED NOT NULL, "
-	      << "  value TINYINT NOT NULL, "
-	      << "  starttime DATETIME NOT NULL, "
-	      << "  endtime DATETIME NOT NULL, "
-	      << "  PRIMARY KEY (id), "
-	      << "  KEY sensor_starttime (sensor, starttime), "
-	      << "  KEY sensor_endtime (sensor, endtime)) "
-	      << "ENGINE MyISAM PACK_KEYS 1 ROW_FORMAT DYNAMIC";
-	query.execute();
-
-	/* Create state sensor data table */
-	query << "CREATE TABLE IF NOT EXISTS " << stateTableName << " ("
-	      << "  id INT AUTO_INCREMENT, "
-	      << "  sensor SMALLINT UNSIGNED NOT NULL, "
-	      << "  value VARCHAR(100) NOT NULL, "
 	      << "  starttime DATETIME NOT NULL, "
 	      << "  endtime DATETIME NOT NULL, "
 	      << "  PRIMARY KEY (id), "
@@ -274,66 +230,6 @@ MysqlDatabase::addSensorValue(NumericSensors sensor, float value)
 	    if (executeQuery(query)) {
 		m_lastInsertIds[sensor] = query.insert_id();
 		m_numericCache[sensor] = value;
-	    }
-	}
-    }
-}
-
-void
-MysqlDatabase::addSensorValue(BooleanSensors sensor, bool value)
-{
-    Database::addSensorValue(sensor, value);
-
-    if (m_connection) {
-	time_t now = time(NULL);
-	std::map<unsigned int, bool>::iterator cacheIter = m_booleanCache.find(sensor);
-	std::map<unsigned int, mysqlpp::ulonglong>::iterator idIter = m_lastInsertIds.find(sensor);
-	bool valueChanged = cacheIter == m_booleanCache.end() || cacheIter->second != value;
-	bool idValid = idIter != m_lastInsertIds.end() && idIter->second != 0;
-	mysqlpp::sql_datetime timestamp(now);
-
-	if (idValid) {
-	    updateRowEndTime(booleanTableName, idIter->second, timestamp);
-	}
-
-	if (valueChanged || !idValid) {
-	    mysqlpp::Query query = m_connection->query();
-	    BooleanSensorValue row(sensor, value, timestamp, timestamp);
-
-	    query.insert(row);
-	    if (executeQuery(query)) {
-		m_lastInsertIds[sensor] = query.insert_id();
-		m_booleanCache[sensor] = value;
-	    }
-	}
-    }
-}
-
-void
-MysqlDatabase::addSensorValue(StateSensors sensor, const std::string& value)
-{
-    Database::addSensorValue(sensor, value);
-
-    if (m_connection) {
-	time_t now = time(NULL);
-	std::map<unsigned int, std::string>::iterator cacheIter = m_stateCache.find(sensor);
-	std::map<unsigned int, mysqlpp::ulonglong>::iterator idIter = m_lastInsertIds.find(sensor);
-	bool valueChanged = cacheIter == m_stateCache.end() || cacheIter->second != value;
-	bool idValid = idIter != m_lastInsertIds.end() && idIter->second != 0;
-	mysqlpp::sql_datetime timestamp(now);
-
-	if (idValid) {
-	    updateRowEndTime(stateTableName, idIter->second, timestamp);
-	}
-
-	if (valueChanged || !idValid) {
-	    mysqlpp::Query query = m_connection->query();
-	    StateSensorValue row(sensor, value, timestamp, timestamp);
-
-	    query.insert(row);
-	    if (executeQuery(query)) {
-		m_lastInsertIds[sensor] = query.insert_id();
-		m_stateCache[sensor] = value;
 	    }
 	}
     }
